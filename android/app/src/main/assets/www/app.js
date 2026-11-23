@@ -25,6 +25,18 @@ const KEY = "ielts85_v1";
 let DB;
 try { DB = JSON.parse(localStorage.getItem(KEY) || "null"); } catch (e) { DB = null; }
 if (!DB) DB = { profiles: {}, cur: null, settings: { apiKey: "", model: "claude-sonnet-5-5", remOn: false, remH: 19, remM: 0 }, run: null };
+{ const st = DB.settings; if (!st.keys) { st.keys = { groq: "", gemini: "", claude: st.apiKey || "" }; st.models = { groq: "openai/gpt-oss-120b", gemini: "gemini-flash-latest", claude: st.model || "claude-sonnet-5-5" }; st.provider = st.apiKey ? "claude" : "groq"; delete st.apiKey; delete st.model; try { localStorage.setItem("ielts85_v1", JSON.stringify(DB)); } catch (e) {} } }
+const PROV = {
+  groq: { name: "Groq", tag: "FREE · recommended", url: "https://console.groq.com/keys", site: "console.groq.com", prefix: "gsk_",
+    steps: ["Open console.groq.com and sign in with your Google account.", "Tap <b>API Keys → Create API Key</b>, give it any name.", "Copy the key (starts with gsk_) and paste it below."],
+    note: "Completely free, no card needed. There's a daily limit, which is plenty for personal practice." },
+  gemini: { name: "Google Gemini", tag: "FREE", url: "https://aistudio.google.com/apikey", site: "aistudio.google.com", prefix: "",
+    steps: ["Open aistudio.google.com and sign in with your Google account.", "Tap <b>Get API key → Create API key</b>.", "Copy the key and paste it below."],
+    note: "Free, no card needed. On the free tier Google may use what you send to improve its products." },
+  claude: { name: "Claude", tag: "paid", url: "https://console.anthropic.com/settings/keys", site: "console.anthropic.com", prefix: "sk-ant-",
+    steps: ["Open console.anthropic.com and sign up.", "Add credit in Billing.", "Tap <b>Create Key</b>, copy it and paste it below."],
+    note: "Strictest marking, but costs a little per essay." }
+};
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(DB)); } catch (e) {} };
 const P = () => DB.profiles[DB.cur];
 function newProfile(name) {
@@ -42,24 +54,41 @@ if (window.claude && typeof window.claude.use === "function") {
 }
 
 /* ---------- AI scoring ---------- */
-const aiCbs = {};
-window.onAiResult = (id, ok, text) => { const cb = aiCbs[id]; if (cb) { delete aiCbs[id]; ok ? cb.res(text) : cb.rej(new Error(text)); } };
-const aiReady = () => !!(DB.settings.apiKey || CL.sample);
-async function askAI(prompt) {
-  const key = DB.settings.apiKey.trim();
-  const body = { model: DB.settings.model || "claude-sonnet-5-5", max_tokens: 3000, messages: [{ role: "user", content: prompt }] };
-  if (A && A.aiRequest && key) {
-    const id = "r" + Math.random().toString(36).slice(2);
-    return new Promise((res, rej) => { aiCbs[id] = { res, rej }; A.aiRequest(id, key, JSON.stringify(body)); });
+const httpCbs = {};
+window.onHttpResult = (id, status, text) => { const cb = httpCbs[id]; if (cb) { delete httpCbs[id]; cb({ status, text }); } };
+const curKey = () => (DB.settings.keys[DB.settings.provider] || "").trim();
+const aiReady = () => !!(curKey() || CL.sample);
+function nativePost(url, headers, body) {
+  const id = "h" + Math.random().toString(36).slice(2);
+  return new Promise(res => { httpCbs[id] = res; A.httpPost(id, url, JSON.stringify(headers), body); });
+}
+async function post(url, headers, bodyObj) {
+  const body = JSON.stringify(bodyObj); let status, text;
+  if (A && A.httpPost) ({ status, text } = await nativePost(url, headers, body));
+  else { const r = await fetch(url, { method: "POST", headers, body }); status = r.status; text = await r.text(); }
+  let j; try { j = JSON.parse(text); } catch (e) { throw new Error(status ? "HTTP " + status : String(text)); }
+  if (status >= 400 || j.error) {
+    const m = (j.error && (j.error.message || j.error)) || ("HTTP " + status);
+    throw new Error(status === 429 ? "Free limit reached for now. Wait a minute and try again." : String(m));
   }
-  if (CL.sample && !key) { const r = await CL.sample(prompt, { modelTier: "complex" }); return r.text; }
-  if (key) {
-    const r = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" }, body: JSON.stringify(body) });
-    const j = await r.json();
-    if (!r.ok) throw new Error(j.error?.message || "AI request failed");
-    return j.content.map(c => c.text || "").join("");
+  return j;
+}
+async function askAI(prompt, json = true) {
+  const st = DB.settings, p = st.provider, key = curKey(), model = (st.models[p] || "").trim();
+  if (!key) { if (CL.sample) { const r = await CL.sample(prompt, { modelTier: "complex" }); return r.text; } throw new Error("NO_AI"); }
+  if (p === "groq") {
+    const j = await post("https://api.groq.com/openai/v1/chat/completions", { "content-type": "application/json", authorization: "Bearer " + key },
+      { model: model || "openai/gpt-oss-120b", messages: [{ role: "user", content: prompt }], max_tokens: 4000, temperature: 0.3, ...(json ? { response_format: { type: "json_object" } } : {}) });
+    return j.choices[0].message.content || "";
   }
-  throw new Error("NO_AI");
+  if (p === "gemini") {
+    const j = await post(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model || "gemini-flash-latest")}:generateContent`, { "content-type": "application/json", "x-goog-api-key": key },
+      { contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { temperature: 0.3, ...(json ? { responseMimeType: "application/json" } : {}) } });
+    return (j.candidates?.[0]?.content?.parts || []).map(x => x.text || "").join("");
+  }
+  const j = await post("https://api.anthropic.com/v1/messages", { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+    { model: model || "claude-sonnet-5-5", max_tokens: 3000, messages: [{ role: "user", content: prompt }] });
+  return j.content.map(c => c.text || "").join("");
 }
 function parseJSON(t) { const a = t.indexOf("{"), b = t.lastIndexOf("}"); return JSON.parse(t.slice(a, b + 1)); }
 
@@ -292,7 +321,7 @@ function feedbackHTML(fb, kind) {
   ${fb.fixes?.length ? `<h3>Corrections</h3>${fb.fixes.map(f => `<div class="fix"><s>${esc(f.from)}</s> → <b>${esc(f.to)}</b></div>`).join("")}` : ""}
   ${fb.upgrade ? `<h3 style="margin-top:12px">Band 9 version</h3><p style="font-size:15px">${esc(fb.upgrade)}</p>` : ""}</div>`;
 }
-const noAI = `<div class="card ai"><b>AI scoring is off.</b> <span class="mute">Open Settings (gear icon) and add your Claude API key to get a band score, corrections and a Band 9 rewrite.</span></div>`;
+const noAI = `<div class="card ai"><b>AI scoring is off.</b> <span class="mute">Add a free Groq or Gemini key to get a band score, corrections and a Band 9 rewrite.</span><div style="margin-top:8px"><button class="btn small" data-act="keysheet">Add free API key</button></div></div>`;
 
 /* ---------- PREP TABS ---------- */
 function hero(m, title, text, extra = "") {
@@ -315,7 +344,7 @@ function viewR() {
     genBtn("R", "reading passage");
 }
 function genBtn(m, what) {
-  if (!aiReady()) return `<p class="mute" style="margin-top:12px">Turn on AI in Settings to generate unlimited new ${what}s.</p>`;
+  if (!aiReady()) return `<button class="btn ghost" style="--c:${MODS[m].c};margin-top:12px;width:100%" data-act="keysheet">Add a free API key to generate unlimited new ${what}s</button>`;
   return `<button class="btn ghost" style="--c:${MODS[m].c};margin-top:12px;width:100%" data-act="gen" data-v="${m}" ${S.busy.gen ? "disabled" : ""}>${S.busy.gen ? '<span class="spin"></span> Writing a new ' + what + "…" : "Generate a new " + what + " with AI"}</button>`;
 }
 function actLR(m) {
@@ -363,7 +392,7 @@ function viewW() {
     <button class="btn" style="--c:var(--W);width:100%" data-act="wsubmit" ${S.busy.w ? "disabled" : ""}>${aiReady() ? "Submit for AI examiner score" : "Submit (self-check)"}</button>
     ${S.fb[dk] ? feedbackHTML(S.fb[dk], "W") : ""}${!aiReady() && S.shown[dk] ? noAI + selfCheck("W") : ""}`;
   }
-  return hero("W", "Writing", "Task 1 (150+ words, describe a chart) and Task 2 (250+ word essay). Task 2 counts double.") + tipsHTML("W") +
+  return hero("W", "Writing", "Task 1 (150+ words, describe a chart) and Task 2 (250+ word essay). Task 2 counts double.") + aiCard() + tipsHTML("W") +
     `<h2>Task 1 · describe the data</h2><div class="list" style="--c:var(--W)">${PRACTICE.writingT1.map((t, i) => `<button class="item" data-act="wopen" data-v="1_${i}"><span class="num">T1</span><span class="grow">${esc(t.chart.title)}<br><span class="mute">${t.chart.type} ${t.chart.type === "table" ? "" : "chart"}</span></span></button>`).join("")}</div>
     <h2>Task 2 · essays</h2><div class="list" style="--c:var(--W)">${PRACTICE.writingT2.map((t, i) => `<button class="item" data-act="wopen" data-v="2_${i}"><span class="num">${i + 1}</span><span class="grow" style="font-size:14.5px">${esc(t)}</span></button>`).join("")}</div>
     <h2>Band 8 phrases</h2><div class="card">${PRACTICE.phrases.slice(0, 10).map(x => `<p>• ${esc(x)}</p>`).join("")}</div>`;
@@ -379,7 +408,7 @@ const P3POOL = () => MOCKS.flatMap(m => m.speaking.p3);
 function viewS() {
   if (S.act) return actS();
   const ph = PRACTICE.phrases[new Date().getDate() % PRACTICE.phrases.length];
-  return hero("S", "Speaking", "11–14 minutes with an examiner: Part 1 about you, Part 2 a 2-minute talk, Part 3 a discussion.") + tipsHTML("S") +
+  return hero("S", "Speaking", "11–14 minutes with an examiner: Part 1 about you, Part 2 a 2-minute talk, Part 3 a discussion.") + aiCard() + tipsHTML("S") +
     `<div class="card" style="--c:var(--S)"><span class="tag">Phrase of the day</span><p style="font-size:19px;font-weight:600;margin-top:6px">“${esc(ph)}”</p><p class="mute">Use it at least once in today's practice.</p></div>
     <h2>Practice</h2><div class="list" style="--c:var(--S)">
     <button class="item" data-act="sopen" data-v="p1"><span class="num">P1</span><span class="grow"><b>Part 1 quick-fire</b><br><span class="mute">4 random questions about you</span></span></button>
@@ -471,7 +500,7 @@ function mockReview() {
   <h1 style="margin-top:12px">Mock ${m.id}: ${esc(m.title)}</h1><p class="mute">${esc(r.date)}</p>
   <div class="overall"><span>Overall band</span><b>${fmtB(r.overall)}</b><span>${r.overall != null ? (r.overall >= P().target ? "Target reached!" : "Target " + fmtB(P().target) + " · keep going") : "Waiting for Writing & Speaking scores"}</span></div>
   <div class="bands">${scoreBox("L", r.Lraw + "/20 correct")}${scoreBox("R", r.Rraw + "/" + m.reading.reduce((n, x) => n + x.qs.length, 0) + " correct")}${scoreBox("W")}${scoreBox("S")}</div>
-  ${needSelf.length ? `<div class="card" style="margin-top:12px"><h3>Score Writing & Speaking</h3>${aiReady() ? `<button class="btn" data-act="mai">Score with AI examiner</button>` : `<p class="mute">AI scoring is off. Rate yourself honestly with the self-check, or add an API key in Settings and come back.</p>${needSelf.map(k => `<div class="field"><label>${MODS[k].name} self-assessed band</label><select data-act="selfband" data-k="${k}"><option value="">Choose…</option>${[4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8, 8.5, 9].map(b => `<option>${b}</option>`).join("")}</select></div>`).join("")}`}</div>` : ""}
+  ${needSelf.length ? `<div class="card" style="margin-top:12px"><h3>Score Writing & Speaking</h3>${aiReady() ? `<button class="btn" data-act="mai">Score with AI examiner</button>` : `<p class="mute">AI scoring is off. Add a free API key to score automatically, or rate yourself honestly.</p><button class="btn small" data-act="keysheet" style="margin-bottom:12px">Add free API key</button>${needSelf.map(k => `<div class="field"><label>${MODS[k].name} self-assessed band</label><select data-act="selfband" data-k="${k}"><option value="">Choose…</option>${[4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8, 8.5, 9].map(b => `<option>${b}</option>`).join("")}</select></div>`).join("")}`}</div>` : ""}
   ${r.fbW ? `<h2>Writing feedback</h2><p class="mute">Task 1: Band ${fmtB(r.fbW1?.band)} · Task 2: Band ${fmtB(r.fbW2?.band)}</p>${feedbackHTML(r.fbW2, "W")}${feedbackHTML(r.fbW1, "W")}` : ""}
   ${r.fbS ? `<h2>Speaking feedback</h2>${feedbackHTML(r.fbS, "S")}` : ""}
   <h2>Listening answers</h2>${m.listening.map((pt, i) => { S.ans["rvL" + i] = r.Lans[i] || []; return `<div class="card"><h3>Part ${i + 1}: ${esc(pt.title)}</h3>${renderQs(pt.qs, "rvL" + i, true, i * 5 + 1)}<details><summary class="mute">Transcript</summary>${scriptHTML(pt.script)}</details></div>`; }).join("")}
@@ -496,23 +525,43 @@ async function scoreMockAI(idx) {
   const r = P().results[idx]; const m = MOCKS.find(x => x.id === r.id);
   S.busy.mW = S.busy.mS = true; render();
   const jobs = [
-    (async () => {
+    async () => {
       try {
-        const [a, b] = await Promise.all([
-          r.w1.trim() ? askAI(writingPrompt(1, m.writing.t1.prompt, r.w1, m.writing.t1.chart)).then(parseJSON) : Promise.resolve({ band: 0, summary: "No answer written." }),
-          r.w2.trim() ? askAI(writingPrompt(2, m.writing.t2, r.w2)).then(parseJSON) : Promise.resolve({ band: 0, summary: "No answer written." })]);
+        const a = r.w1.trim() ? parseJSON(await askAI(writingPrompt(1, m.writing.t1.prompt, r.w1, m.writing.t1.chart))) : { band: 0, summary: "No answer written." };
+        const b = r.w2.trim() ? parseJSON(await askAI(writingPrompt(2, m.writing.t2, r.w2))) : { band: 0, summary: "No answer written." };
         r.fbW1 = a; r.fbW2 = b; r.fbW = true; r.W = roundBand((a.band + 2 * b.band) / 3);
       } catch (e) { toast("Writing scoring failed: " + e.message); }
       S.busy.mW = false; finalize(r); render();
-    })(),
-    (async () => {
+    },
+    async () => {
       const sp = m.speaking, a = r.sp;
       const txt = `PART 1:\n${sp.p1.map((q, i) => "Q: " + q + "\nA: " + (a["m1_" + i] || "(no answer)")).join("\n")}\nPART 2 cue card: ${sp.p2.topic}\nA: ${a.m2 || "(no answer)"}\nPART 3:\n${sp.p3.map((q, i) => "Q: " + q + "\nA: " + (a["m3_" + i] || "(no answer)")).join("\n")}`;
       try { const f = parseJSON(await askAI(speakingPrompt(txt))); r.fbS = f; r.S = f.band; } catch (e) { toast("Speaking scoring failed: " + e.message); }
       S.busy.mS = false; finalize(r); render();
-    })()];
-  await Promise.all(jobs);
+    }];
+  for (const job of jobs) await job();
 }
+
+/* ---------- API key sheet ---------- */
+function openKeySheet(first, prov) {
+  document.getElementById("modal")?.remove();
+  const st = DB.settings; const p = prov || st.provider || "groq"; const pv = PROV[p];
+  const m = document.createElement("div"); m.className = "modal"; m.id = "modal";
+  m.innerHTML = `<div class="sheet" role="dialog" aria-label="AI examiner"><h1>Turn on the AI examiner</h1>
+  <p class="mute">The AI marks your Writing and Speaking like a real examiner, corrects mistakes, writes a Band 9 version, and creates unlimited new practice. Groq and Gemini are free.</p>
+  <div class="seg" role="radiogroup" aria-label="AI provider" style="margin-bottom:12px">${Object.entries(PROV).map(([k, v]) => `<button class="opt ${k === p ? "sel" : ""}" data-act="kprov" data-v="${k}" style="--c:var(--teal2);flex-direction:column;gap:0"><b>${v.name}</b><span style="font-size:11.5px">${v.tag}</span></button>`).join("")}</div>
+  <div class="card" style="font-size:15px"><b>Get your free ${pv.name} key (2 min)</b><ol style="margin:8px 0 0 18px;padding:0">${pv.steps.map((x, i) => `<li>${i === 0 ? x.replace(pv.site, `<a href="${pv.url}" target="_blank" rel="noopener">${pv.site}</a>`) : x}</li>`).join("")}</ol>
+  <p class="mute" style="margin:8px 0 0">${pv.note}</p></div>
+  <div class="field"><label for="kKey">${pv.name} API key</label><input id="kKey" data-prov="${p}" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${pv.prefix ? pv.prefix + "…" : "Paste your key"}" value="${esc(st.keys[p] || "")}"></div>
+  <details class="tips"><summary>Advanced: model name</summary><div class="field" style="margin-top:8px"><input id="kModel" value="${esc(st.models[p] || "")}" aria-label="Model name"></div><p class="mute">Leave as it is unless the provider renames its models.</p></details>
+  <p class="mute">Your key is saved only on this phone and sent only to ${pv.name}.</p>
+  <div class="row"><button class="btn" data-act="keysave">Save & test</button>${st.keys[p] ? `<button class="btn ghost small" data-act="keyclear" data-v="${p}" style="--c:var(--bad)">Remove key</button>` : ""}<button class="btn ghost small" data-act="close">${first ? "Skip for now" : "Close"}</button></div>
+  <p id="kStatus" class="mute" style="margin-top:10px"></p></div>`;
+  document.body.appendChild(m);
+}
+const aiLabel = () => curKey() ? PROV[DB.settings.provider].name + (DB.settings.provider === "claude" ? "" : " (free)") : "Claude";
+const aiCard = () => aiReady() ? `<div class="card" style="--c:var(--ok)"><span class="tag" style="--c:var(--ok)">AI examiner on</span> <span class="mute">Using ${aiLabel()} · <button class="btn ghost small" data-act="keysheet" style="min-height:30px;padding:2px 10px">Change</button></span></div>`
+  : `<div class="card ai" style="--c:var(--coral)"><b>Get your band score, free</b><p class="mute" style="margin:4px 0 10px">Add a free Groq or Gemini key (2 minutes) to get an AI examiner's score, corrections and a Band 9 rewrite.</p><button class="btn" style="--c:var(--coral)" data-act="keysheet">Add free API key</button></div>`;
 
 /* ---------- settings ---------- */
 function openSettings() {
@@ -530,10 +579,9 @@ function openSettings() {
   <div class="row"><button class="btn small" data-act="remset">${st.remOn ? "Update reminder" : "Turn on reminder"}</button>${st.remOn ? `<button class="btn ghost small" data-act="remoff">Turn off</button>` : ""}${isA ? "" : `<button class="btn ghost small" data-act="ics">Add to phone calendar</button>`}</div>
   <p class="mute" style="margin-top:8px">${isA ? "The Android app sends a notification every day at this time." : "In a browser, notifications only appear while the app is open, so add the daily event to your phone calendar for a reliable alert."}</p>
   <h2>AI examiner</h2>
-  <p class="mute">${CL.sample && !st.apiKey ? "Connected through Claude: no key needed while you use the app inside Claude." : "Scores Writing and Speaking and generates new practice. Paste a Claude API key from console.anthropic.com. It's stored only on this phone."}</p>
-  <div class="field"><label for="sKey">Claude API key</label><input id="sKey" type="password" autocomplete="off" placeholder="sk-ant-…" value="${esc(st.apiKey)}"></div>
-  <div class="field"><label for="sModel">Model</label><select id="sModel">${[["claude-sonnet-5-5", "Claude Sonnet 5.5 (recommended)"], ["claude-opus-5-5", "Claude Opus 5.5 (strictest, costs more)"], ["claude-haiku-5-5", "Claude Haiku 5.5 (cheapest)"]].map(([v, l]) => `<option value="${v}" ${v === st.model ? "selected" : ""}>${l}</option>`).join("")}</select></div>
-  <button class="btn small" data-act="aitest">Test AI connection</button>
+  <p class="mute">Scores Writing and Speaking and creates new practice. Free options: Groq or Google Gemini.</p>
+  <p><b>Status:</b> ${curKey() ? "On, using " + aiLabel() : CL.sample ? "On, connected through Claude" : "Off"}</p>
+  <div class="row"><button class="btn small" data-act="keysheet">${curKey() ? "Change API key" : "Add free API key"}</button>${aiReady() ? `<button class="btn ghost small" data-act="aitest">Test AI connection</button>` : ""}</div>
   <h2>Data</h2><button class="btn ghost small" data-act="reset" style="--c:var(--bad)">Reset this profile</button></div>`;
   document.body.appendChild(m);
 }
@@ -541,7 +589,6 @@ function readSettings() {
   const p = P(); const g = id => document.getElementById(id);
   if (!g("sName")) return;
   p.name = g("sName").value.trim() || p.name; p.target = +g("sTarget").value; p.examDate = g("sExam").value;
-  DB.settings.apiKey = g("sKey").value.trim(); DB.settings.model = g("sModel").value;
   const [h, mi] = (g("sRem").value || "19:00").split(":").map(Number); DB.settings.remH = h; DB.settings.remM = mi;
   save();
 }
@@ -659,10 +706,23 @@ document.addEventListener("click", async e => {
   }
   // settings
   if (act === "close") { readSettings(); document.getElementById("modal")?.remove(); render(); return; }
+  if (act === "keysheet") { readSettings(); openKeySheet(false); return; }
+  if (act === "kprov") { const k = document.getElementById("kKey"); if (k && k.value.trim()) DB.settings.keys[k.dataset.prov] = k.value.trim(); openKeySheet(false, v); return; }
+  if (act === "keyclear") { DB.settings.keys[v] = ""; save(); document.getElementById("modal")?.remove(); render(); toast("API key removed"); return; }
+  if (act === "keysave") {
+    const kEl = document.getElementById("kKey"), k = kEl.value.trim(), prov = kEl.dataset.prov, st = document.getElementById("kStatus");
+    if (!k) { st.textContent = "Paste your key first."; return; }
+    if (PROV[prov].prefix && !k.startsWith(PROV[prov].prefix)) { st.textContent = `That doesn't look like a ${PROV[prov].name} key. It should start with ${PROV[prov].prefix}`; return; }
+    DB.settings.provider = prov; DB.settings.keys[prov] = k; DB.settings.models[prov] = document.getElementById("kModel").value.trim(); save();
+    b.disabled = true; st.innerHTML = '<span class="spin"></span> Testing your key…';
+    try { await askAI("Reply with exactly: OK", false); st.textContent = "Connected! The AI examiner is ready."; toast("AI examiner is on"); setTimeout(() => { document.getElementById("modal")?.remove(); render(); }, 900); }
+    catch (err) { st.textContent = "Saved, but the test failed: " + err.message + ". Check that you copied the whole key."; b.disabled = false; }
+    return;
+  }
   if (act === "remset") { setReminder(); return; }
   if (act === "remoff") { DB.settings.remOn = false; save(); if (A && A.cancelReminder) A.cancelReminder(); toast("Reminder off"); document.getElementById("modal")?.remove(); openSettings(); return; }
   if (act === "ics") { downloadICS(); return; }
-  if (act === "aitest") { readSettings(); b.innerHTML = '<span class="spin"></span> Testing…'; try { const t = await askAI("Reply with exactly: OK"); toast(/ok/i.test(t) ? "AI examiner connected" : "Got a reply: " + t.slice(0, 40)); } catch (err) { toast(err.message === "NO_AI" ? "Add an API key first." : "Failed: " + err.message); } b.textContent = "Test AI connection"; return; }
+  if (act === "aitest") { readSettings(); b.innerHTML = '<span class="spin"></span> Testing…'; try { const t = await askAI("Reply with exactly: OK", false); toast(/ok/i.test(t) ? "AI examiner connected" : "Got a reply: " + t.slice(0, 40)); } catch (err) { toast(err.message === "NO_AI" ? "Add an API key first." : "Failed: " + err.message); } b.textContent = "Test AI connection"; return; }
   if (act === "reset") { if (b.dataset.sure) { const n = P().name; delete DB.profiles[DB.cur]; newProfile(n); document.getElementById("modal")?.remove(); render(); toast("Profile reset"); } else { b.dataset.sure = 1; b.textContent = "Tap again to erase all progress"; } return; }
 });
 document.getElementById("setBtn").addEventListener("click", openSettings);
@@ -688,7 +748,7 @@ function askName(adding) {
   m.innerHTML = `<div class="sheet"><h1>${adding ? "New profile" : "Welcome! Let's get you to Band 8.5"}</h1><p class="mute">Each day, finish all four modules (Listening, Reading, Writing, Speaking) to keep your streak alive. Take a mock test every few days to track your band.</p>
   <form id="nameForm"><div class="field"><label for="nm">Your name</label><input id="nm" required autocomplete="given-name" placeholder="e.g. Pari"></div><button class="btn" style="width:100%">Start preparing</button></form></div>`;
   document.body.appendChild(m);
-  document.getElementById("nameForm").addEventListener("submit", ev => { ev.preventDefault(); const n = document.getElementById("nm").value.trim(); if (!n) return; newProfile(n); m.remove(); render(); });
+  document.getElementById("nameForm").addEventListener("submit", ev => { ev.preventDefault(); const n = document.getElementById("nm").value.trim(); if (!n) return; newProfile(n); m.remove(); render(); if (!aiReady()) openKeySheet(true); });
 }
 
 /* ---------- render ---------- */

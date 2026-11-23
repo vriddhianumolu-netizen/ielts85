@@ -148,38 +148,29 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface public void cancelReminder() { Reminders.cancel(MainActivity.this); }
 
+        /** Generic HTTPS POST used for the AI examiner (Groq, Gemini or Claude). Result: window.onHttpResult(id, status, text). */
         @JavascriptInterface
-        public void aiRequest(final String id, final String apiKey, final String body) {
+        public void httpPost(final String id, final String url, final String headersJson, final String body) {
             new Thread(() -> {
-                boolean ok = false;
+                int code = 0;
                 String out;
                 try {
-                    HttpURLConnection c = (HttpURLConnection) new URL("https://api.anthropic.com/v1/messages").openConnection();
+                    if (!url.startsWith("https://")) throw new IllegalArgumentException("https only");
+                    HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
                     c.setRequestMethod("POST");
                     c.setConnectTimeout(20000);
-                    c.setReadTimeout(120000);
+                    c.setReadTimeout(180000);
                     c.setDoOutput(true);
-                    c.setRequestProperty("content-type", "application/json");
-                    c.setRequestProperty("x-api-key", apiKey);
-                    c.setRequestProperty("anthropic-version", "2023-06-01");
+                    JSONObject h = new JSONObject(headersJson);
+                    java.util.Iterator<String> it = h.keys();
+                    while (it.hasNext()) { String k = it.next(); c.setRequestProperty(k, h.getString(k)); }
                     try (OutputStream os = c.getOutputStream()) { os.write(body.getBytes(StandardCharsets.UTF_8)); }
-                    int code = c.getResponseCode();
-                    InputStream is = code < 400 ? c.getInputStream() : c.getErrorStream();
-                    String resp = readAll(is);
-                    JSONObject j = new JSONObject(resp);
-                    if (code < 400) {
-                        StringBuilder sb = new StringBuilder();
-                        JSONArray content = j.getJSONArray("content");
-                        for (int i = 0; i < content.length(); i++) sb.append(content.getJSONObject(i).optString("text", ""));
-                        out = sb.toString();
-                        ok = true;
-                    } else {
-                        out = j.has("error") ? j.getJSONObject("error").optString("message", "HTTP " + code) : "HTTP " + code;
-                    }
+                    code = c.getResponseCode();
+                    out = readAll(code < 400 ? c.getInputStream() : c.getErrorStream());
                 } catch (Exception e) {
-                    out = "Network error: " + e.getMessage();
+                    out = "Network error: " + e.getMessage() + ". Check your internet connection.";
                 }
-                js("window.onAiResult&&window.onAiResult(" + JSONObject.quote(id) + "," + ok + "," + JSONObject.quote(out) + ")");
+                js("window.onHttpResult&&window.onHttpResult(" + JSONObject.quote(id) + "," + code + "," + JSONObject.quote(out) + ")");
             }).start();
         }
     }
