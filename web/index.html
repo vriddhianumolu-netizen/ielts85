@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b5d5e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="IELTS 8.5">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>IELTS 8.5 Prep</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* VOICE: an upbeat study coach — clear, encouraging, exam-serious
+   IDEA: an exam answer booklet that keeps score like a game
+   PICTURE: the band ring + four module chips at the top of every tab
+   COLOUR: deep teal ground, coral accent, sunny highlight; one hue per module
+   TYPE: Lexend (built for reading fluency); LAYOUT: one column, bottom tab bar */
+:root{color-scheme:light dark;
+--bg:light-dark(#f4f7f6,#0e1615);--card:light-dark(#ffffff,#16211f);--ink:light-dark(#10201e,#e8f1ef);--mute:light-dark(#5d6f6c,#93a8a4);
+--line:light-dark(#dce6e3,#26342f);--teal:#0b5d5e;--teal2:light-dark(#0b5d5e,#3fb8a8);--coral:#ff6b4a;--sun:#ffd23f;
+--L:#0f8b8d;--R:#2f5bea;--W:#e8553a;--S:#7a4dd8;--M:#14213d;--ok:#1f9d55;--bad:#d64545;
+--safe-b:env(safe-area-inset-bottom,0px);--safe-t:env(safe-area-inset-top,0px)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--ink);font:16px/1.55 Lexend,system-ui,-apple-system,"Segoe UI",sans-serif;overflow-x:clip;-webkit-tap-highlight-color:transparent}
+button,input,textarea,select{font:inherit;color:inherit}
+button{cursor:pointer}
+.top{position:sticky;top:0;z-index:20;background:var(--teal);color:#fff;padding:calc(10px + var(--safe-t)) 16px 12px}
+.toprow{display:flex;align-items:center;gap:10px;max-width:760px;margin:0 auto}
+.brand{font-weight:700;font-size:19px;flex:1;letter-spacing:-.2px}
+.brand small{display:block;font-weight:400;font-size:12px;opacity:.8}
+.pill{display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.14);border-radius:99px;padding:5px 10px;font-size:14px;font-weight:600;border:0;color:#fff;min-height:34px}
+.pill svg{width:16px;height:16px}
+.daybar{display:flex;gap:6px;max-width:760px;margin:10px auto 0}
+.chip{flex:1;display:flex;align-items:center;justify-content:center;gap:5px;border-radius:10px;padding:6px 4px;font-size:12.5px;font-weight:600;background:rgba(255,255,255,.1);color:#d9f0ec;border:1px solid rgba(255,255,255,.18)}
+.chip.done{background:var(--sun);color:#3b2a00;border-color:var(--sun)}
+main{max-width:760px;margin:0 auto;padding:16px 14px calc(96px + var(--safe-b))}
+.nav{position:fixed;bottom:0;left:0;right:0;z-index:30;background:var(--card);border-top:1px solid var(--line);display:flex;padding:6px 6px calc(6px + var(--safe-b))}
+.nav button{flex:1;border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px;font-size:11.5px;color:var(--mute);border-radius:12px;min-height:52px}
+.nav button svg{width:24px;height:24px}
+.nav button.on{color:var(--c);background:color-mix(in srgb,var(--c) 12%,transparent);font-weight:600}
+h1{font-size:26px;line-height:1.15;margin:4px 0 4px;letter-spacing:-.4px}
+h2{font-size:19px;margin:22px 0 10px}
+h3{font-size:16px;margin:0 0 6px}
+p{margin:0 0 10px}
+.mute{color:var(--mute);font-size:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:12px}
+.hero{border-radius:18px;padding:18px;color:#fff;background:var(--c);margin-bottom:14px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center}
+.hero p{opacity:.9;font-size:14px;margin:0}
+.ring{width:84px;height:84px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:12px;padding:11px 16px;min-height:46px;font-weight:600;background:var(--c,var(--teal));color:#fff}
+.btn.ghost{background:transparent;color:var(--c,var(--teal2));border:1.5px solid currentColor}
+.btn.small{min-height:36px;padding:6px 12px;font-size:14px}
+.btn:disabled{opacity:.45;cursor:default}
+.btn:focus-visible,.nav button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.list{display:grid;gap:10px}
+.item{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:13px 14px;width:100%;text-align:left}
+.item .num{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;font-weight:700;background:color-mix(in srgb,var(--c) 14%,transparent);color:var(--c);flex:none}
+.item .grow{flex:1}
+.item .score{font-weight:700;color:var(--c)}
+.tag{display:inline-block;font-size:12px;font-weight:600;padding:2px 8px;border-radius:99px;background:color-mix(in srgb,var(--c,var(--teal)) 14%,transparent);color:var(--c,var(--teal2))}
+details.tips{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:12px}
+details.tips summary{font-weight:600;cursor:pointer}
+details.tips li{margin:6px 0;font-size:15px}
+.q{padding:12px 0;border-top:1px solid var(--line)}
+.q:first-child{border-top:0}
+.q .qt{font-weight:500;margin-bottom:8px}
+.q input[type=text]{width:100%;max-width:340px;border:1.5px solid var(--line);background:var(--bg);border-radius:10px;padding:10px 12px;font-size:16px}
+.opts{display:grid;gap:6px}
+.opt{display:flex;gap:10px;align-items:center;border:1.5px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--bg);text-align:left;width:100%;min-height:44px}
+.opt.sel{border-color:var(--c);background:color-mix(in srgb,var(--c) 10%,var(--bg))}
+.opt.right{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 14%,var(--bg))}
+.opt.wrong{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 12%,var(--bg))}
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.seg .opt{width:auto;flex:1;justify-content:center;min-width:64px}
+.fb{font-size:14px;margin-top:6px;font-weight:600}
+.fb.ok{color:var(--ok)}.fb.no{color:var(--bad)}
+.passage p{font-size:16px;line-height:1.7}
+.passage{max-height:46vh;overflow:auto;border:1px solid var(--line);border-radius:14px;padding:14px;background:var(--card);margin-bottom:12px}
+.passage.full{max-height:none}
+textarea{width:100%;min-height:260px;border:1.5px solid var(--line);background:var(--card);border-radius:14px;padding:14px;font-size:16px;line-height:1.6;resize:vertical}
+textarea.short{min-height:110px}
+.stat{display:flex;justify-content:space-between;gap:10px;font-size:14px;color:var(--mute);margin:6px 0 12px}
+.timer{font-variant-numeric:tabular-nums;font-weight:700;color:var(--c)}
+.timer.low{color:var(--bad)}
+.bands{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.band{border-radius:14px;padding:14px;background:color-mix(in srgb,var(--c) 12%,var(--card));border:1px solid color-mix(in srgb,var(--c) 30%,transparent)}
+.band b{display:block;font-size:30px;line-height:1.1;color:var(--c)}
+.band span{font-size:13px;color:var(--mute)}
+.overall{text-align:center;padding:22px;border-radius:18px;background:var(--M);color:#fff;margin-bottom:12px}
+.overall b{font-size:56px;line-height:1;display:block;color:var(--sun)}
+.bar{height:10px;border-radius:99px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--c);border-radius:99px}
+.crit{display:grid;grid-template-columns:8.5em minmax(0,1fr) 2.5em;gap:8px;align-items:center;font-size:14px;margin:6px 0}
+.chart{width:100%;height:auto;display:block}
+table.t1{width:100%;border-collapse:collapse;font-size:14px}
+table.t1 th,table.t1 td{border-bottom:1px solid var(--line);padding:8px 6px;text-align:right}
+table.t1 th:first-child,table.t1 td:first-child{text-align:left}
+.script{font-size:14.5px;background:var(--bg);border-radius:12px;padding:12px;margin-top:10px}
+.script p{margin:0 0 6px}
+.mic{width:56px;height:56px;border-radius:50%;border:0;background:var(--S);color:#fff;display:grid;place-items:center;flex:none}
+.mic.on{background:var(--bad);animation:pulse 1.2s infinite}
+.mic svg{width:26px;height:26px}
+@keyframes pulse{50%{box-shadow:0 0 0 10px color-mix(in srgb,var(--bad) 25%,transparent)}}
+.cue{border-left:5px solid var(--S);background:color-mix(in srgb,var(--S) 8%,var(--card))}
+.cue ul{margin:6px 0 0 18px;padding:0}
+.word{font-size:26px;font-weight:700;color:var(--c)}
+.modal{position:fixed;inset:0;background:rgba(5,15,14,.55);z-index:50;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--card);width:100%;max-width:560px;max-height:90vh;overflow:auto;border-radius:20px 20px 0 0;padding:20px 18px calc(20px + var(--safe-b))}
+.field{display:grid;gap:6px;margin-bottom:14px}
+.field label{font-size:14px;font-weight:600}
+.field input,.field select{border:1.5px solid var(--line);background:var(--bg);border-radius:10px;padding:10px 12px;font-size:16px;min-height:44px}
+#toasts{position:fixed;left:50%;bottom:calc(84px + var(--safe-b));transform:translateX(-50%);z-index:60;display:grid;gap:8px;width:max-content;max-width:90vw}
+.toast{background:var(--M);color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;text-align:center;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+.ai{border:1.5px dashed color-mix(in srgb,var(--c) 50%,transparent)}
+.ai ul{margin:6px 0 10px 18px;padding:0}
+.fix{font-size:14px;margin:4px 0}.fix s{color:var(--bad)}.fix b{color:var(--ok)}
+.spin{width:22px;height:22px;border:3px solid var(--line);border-top-color:var(--c);border-radius:50%;animation:sp 0.8s linear infinite;display:inline-block;vertical-align:middle}
+@keyframes sp{to{transform:rotate(360deg)}}
+.hist{display:flex;align-items:flex-end;gap:6px;height:120px;padding-top:10px}
+.hist div{flex:1;background:var(--M);border-radius:6px 6px 0 0;position:relative;min-height:4px}
+.hist div span{position:absolute;top:-18px;left:0;right:0;text-align:center;font-size:11px;font-weight:600}
+.badges{display:flex;gap:8px;flex-wrap:wrap}
+.badge{font-size:13px;padding:6px 10px;border-radius:10px;background:color-mix(in srgb,var(--sun) 30%,var(--card));border:1px solid var(--sun)}
+.badge.off{opacity:.35;background:var(--card);border-color:var(--line)}
+.confetti{position:fixed;inset:0;pointer-events:none;z-index:70}
+@media (prefers-reduced-motion:reduce){.mic.on,.spin{animation:none}}
+@media (max-width:420px){h1{font-size:23px}.hero{grid-template-columns:1fr}.ring{display:none}.crit{grid-template-columns:7em minmax(0,1fr) 2.5em}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="toprow">
+    <div class="brand">IELTS 8.5<small id="hello">Academic prep</small></div>
+    <button class="pill" id="streakPill" aria-label="Streak"></button>
+    <button class="pill" id="xpPill" aria-label="XP"></button>
+    <button class="pill" id="setBtn" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+  </div>
+  <div class="daybar" id="daybar"></div>
+</header>
+<main id="view"></main>
+<nav class="nav" id="nav"></nav>
+<script src="data/mocks1.js"></script>
+<script src="data/mocks2.js"></script>
+<script src="data/mocks3.js"></script>
+<script src="data/practice.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
