@@ -325,7 +325,7 @@ const noAI = `<div class="card ai"><b>AI scoring is off.</b> <span class="mute">
 
 /* ---------- PREP TABS ---------- */
 function hero(m, title, text, extra = "") {
-  return `<div class="hero" style="--c:${MODS[m].c}"><div><h1>${title}</h1><p>${text}</p>${extra}</div>${ring(Math.min(1, (P().done[m] || 0) / 20), String(P().done[m] || 0), "sessions")}</div>`;
+  return `<div class="hero" style="--c:${({ L: "#0f8b8d", R: "#2f5bea", W: "#d9482e", S: "#7a4dd8" })[m]}"><div><h1>${title}</h1><p>${text}</p>${extra}</div>${ring(Math.min(1, (P().done[m] || 0) / 20), String(P().done[m] || 0), "sessions")}</div>`;
 }
 const tipsHTML = m => `<details class="tips"><summary>Strategy tips for Band 8+</summary><ul>${PRACTICE.tips[{ L: "listening", R: "reading", W: "writing", S: "speaking" }[m]].map(t => `<li>${esc(t)}</li>`).join("")}</ul></details>`;
 
@@ -440,7 +440,7 @@ function viewM() {
   const days = p.examDate ? Math.ceil((new Date(p.examDate) - new Date(dayKey())) / 86400000) : null;
   const lv = level(p.xp);
   const last = res.slice(-10);
-  return `<div class="hero" style="--c:var(--M)"><div><h1>Mock Tests</h1><p>10 full Academic tests: Listening, Reading, Writing and Speaking, timed like the real exam, with a band for each section and overall.</p>
+  return `<div class="hero" style="--c:var(--Mbg)"><div><h1>Mock Tests</h1><p>10 full Academic tests: Listening, Reading, Writing and Speaking, timed like the real exam, with a band for each section and overall.</p>
     <p style="margin-top:8px"><b>Best overall: ${fmtB(best)}</b> · target ${fmtB(p.target)}${days != null ? ` · exam in ${days} days` : ""}</p></div>${ring((best || 0) / p.target, fmtB(best), "best band")}</div>
   ${last.length ? `<div class="card"><h3>Your last ${last.length} mock${last.length > 1 ? "s" : ""}</h3><div class="hist">${last.map(r => `<div style="height:${(r.overall || 0) / 9 * 100}%" title="Mock ${r.id}"><span>${fmtB(r.overall)}</span></div>`).join("")}</div></div>` : ""}
   <h2>Choose a test</h2><div class="list" style="--c:var(--M)">${MOCKS.map(m => { const rs = res.filter(r => r.id === m.id); const b = rs.length ? Math.max(...rs.map(r => r.overall || 0)) : null; return `<button class="item" data-act="mstart" data-v="${m.id}"><span class="num">${m.id}</span><span class="grow"><b>${esc(m.title)}</b><br><span class="mute">${rs.length ? rs.length + " attempt" + (rs.length > 1 ? "s" : "") : "Not taken yet"}</span></span><span class="score">${b != null ? "Band " + fmtB(b) : ""}</span></button>`; }).join("")}</div>
@@ -582,8 +582,17 @@ function openSettings() {
   <p class="mute">Scores Writing and Speaking and creates new practice. Free options: Groq or Google Gemini.</p>
   <p><b>Status:</b> ${curKey() ? "On, using " + aiLabel() : CL.sample ? "On, connected through Claude" : "Off"}</p>
   <div class="row"><button class="btn small" data-act="keysheet">${curKey() ? "Change API key" : "Add free API key"}</button>${aiReady() ? `<button class="btn ghost small" data-act="aitest">Test AI connection</button>` : ""}</div>
+  <h2>Appearance</h2>
+  <div class="seg" role="radiogroup" aria-label="Theme">${[["auto", "Auto (phone)"], ["light", "Light"], ["dark", "Dark"]].map(([v, l]) => `<button class="opt ${(st.theme || "auto") === v ? "sel" : ""}" data-act="theme" data-v="${v}" style="--c:var(--teal2)">${l}</button>`).join("")}</div>
   <h2>Data</h2><button class="btn ghost small" data-act="reset" style="--c:var(--bad)">Reset this profile</button></div>`;
   document.body.appendChild(m);
+}
+function applyTheme() {
+  const t = DB.settings.theme || "auto", r = document.documentElement;
+  if (t === "auto") { if (r.dataset.userTheme) { delete r.dataset.theme; delete r.dataset.userTheme; } }
+  else { r.dataset.theme = t; r.dataset.userTheme = "1"; }
+  const dark = t === "dark" || (t === "auto" && (r.dataset.theme === "dark" || (!r.dataset.theme && matchMedia("(prefers-color-scheme: dark)").matches)));
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", dark ? "#0a2e2e" : "#0b5d5e");
 }
 function readSettings() {
   const p = P(); const g = id => document.getElementById(id);
@@ -719,6 +728,7 @@ document.addEventListener("click", async e => {
     catch (err) { st.textContent = "Saved, but the test failed: " + err.message + ". Check that you copied the whole key."; b.disabled = false; }
     return;
   }
+  if (act === "theme") { DB.settings.theme = v; save(); applyTheme(); b.parentElement.querySelectorAll(".opt").forEach(o => o.classList.toggle("sel", o === b)); return; }
   if (act === "remset") { setReminder(); return; }
   if (act === "remoff") { DB.settings.remOn = false; save(); if (A && A.cancelReminder) A.cancelReminder(); toast("Reminder off"); document.getElementById("modal")?.remove(); openSettings(); return; }
   if (act === "ics") { downloadICS(); return; }
@@ -760,5 +770,7 @@ function render() {
   $("#view").innerHTML = v; tick();
 }
 if (A && A.onReady) A.onReady();
+applyTheme();
+matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", applyTheme);
 render();
 }

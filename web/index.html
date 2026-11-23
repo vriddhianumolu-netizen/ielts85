@@ -22,7 +22,7 @@
 :root{color-scheme:light dark;
 --bg:light-dark(#f4f7f6,#0e1615);--card:light-dark(#ffffff,#16211f);--ink:light-dark(#10201e,#e8f1ef);--mute:light-dark(#5d6f6c,#93a8a4);
 --line:light-dark(#dce6e3,#26342f);--teal:#0b5d5e;--teal2:light-dark(#0b5d5e,#3fb8a8);--coral:#ff6b4a;--sun:#ffd23f;
---L:#0f8b8d;--R:#2f5bea;--W:#e8553a;--S:#7a4dd8;--M:#14213d;--ok:#1f9d55;--bad:#d64545;
+--L:#0f8b8d;--R:light-dark(#2f5bea,#6f8fff);--W:#e8553a;--S:light-dark(#7a4dd8,#a98bf0);--M:light-dark(#14213d,#9fb3ff);--Mbg:#14213d;--ok:#1f9d55;--bad:#d64545;
 --safe-b:env(safe-area-inset-bottom,0px);--safe-t:env(safe-area-inset-top,0px)}
 :root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
 *{box-sizing:border-box;min-width:0}
@@ -93,7 +93,7 @@ textarea.short{min-height:110px}
 .band{border-radius:14px;padding:14px;background:color-mix(in srgb,var(--c) 12%,var(--card));border:1px solid color-mix(in srgb,var(--c) 30%,transparent)}
 .band b{display:block;font-size:30px;line-height:1.1;color:var(--c)}
 .band span{font-size:13px;color:var(--mute)}
-.overall{text-align:center;padding:22px;border-radius:18px;background:var(--M);color:#fff;margin-bottom:12px}
+.overall{text-align:center;padding:22px;border-radius:18px;background:var(--Mbg);color:#fff;margin-bottom:12px}
 .overall b{font-size:56px;line-height:1;display:block;color:var(--sun)}
 .bar{height:10px;border-radius:99px;background:var(--line);overflow:hidden}
 .bar i{display:block;height:100%;background:var(--c);border-radius:99px}
@@ -117,7 +117,7 @@ table.t1 th:first-child,table.t1 td:first-child{text-align:left}
 .field label{font-size:14px;font-weight:600}
 .field input,.field select{border:1.5px solid var(--line);background:var(--bg);border-radius:10px;padding:10px 12px;font-size:16px;min-height:44px}
 #toasts{position:fixed;left:50%;bottom:calc(84px + var(--safe-b));transform:translateX(-50%);z-index:60;display:grid;gap:8px;width:max-content;max-width:90vw}
-.toast{background:var(--M);color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;text-align:center;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+.toast{background:var(--Mbg);color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;text-align:center;box-shadow:0 6px 20px rgba(0,0,0,.25)}
 .ai{border:1.5px dashed color-mix(in srgb,var(--c) 50%,transparent)}
 .ai ul{margin:6px 0 10px 18px;padding:0}
 .fix{font-size:14px;margin:4px 0}.fix s{color:var(--bad)}.fix b{color:var(--ok)}
